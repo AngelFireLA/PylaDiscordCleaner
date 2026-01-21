@@ -1,3 +1,5 @@
+import time
+
 import discord
 from discord.ext import commands
 from discord.ui import View, Button
@@ -5,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 intents = discord.Intents.all()
 GUILD_ID = 1205263029269438574
-STAFF_ROLE_IDS = [1245105922146308106, 1219692597333725265, 1211358165451673650, 1229413711916040303]  # Add your staff role IDs here
+STAFF_ROLE_IDS = [1258415474622857277, 1245105922146308106, 1219692597333725265, 1211358165451673650, 1229413711916040303]  # Add your staff role IDs here
 bot = commands.Bot(command_prefix='/', intents=intents)
 
 
@@ -38,31 +40,40 @@ async def on_reaction_add(reaction, user):
 async def delete_closed_and_empty_tickets(channel):
     print("Starting to clean")
     guild = bot.get_guild(GUILD_ID)
+    k = 0
     for ch in guild.channels:
         if isinstance(ch, discord.TextChannel):  # Check if channel is a text channel
             if ch.name.startswith("closed"):
                 await ch.delete()
+                k += 1
+                time.sleep(0.1)
             elif ch.name.startswith("ticket"):
                 empty = True
                 async for message in ch.history(limit=10):
                     if message.author.id != bot.user.id:
+                        if not message.author.id in [member.id for member in ch.guild.members]:
+                            print(message.author.name, "isn't in the discord anymore", ch.name)
+                            break
                         empty = False
                         break
                 if empty:
                     print("deleted open ticket", ch.name)
+                    k+=1
                     await ch.delete()
-
+                    time.sleep(0.1)
+    await channel.send(f"Cleaned {k} tickets that were either closed or the user left the discord")
+    print("Done cleaning")
 
 async def ping_inactive_tickets(channel):
     guild = bot.get_guild(GUILD_ID)
     for ch in guild.channels:
-        if ch.name.startswith("ticket") and ch.name != "open-ticket":
+        if not isinstance(ch, discord.CategoryChannel) and ch.name.startswith("ticket") and ch.name != "open-ticket":
             last_message = None
             async for message in ch.history(limit=1):
                 last_message = message
                 break
 
-            if last_message and (datetime.now(timezone.utc) - last_message.created_at) > timedelta(days=14) and not last_message.author.bot:
+            if last_message and (datetime.now(timezone.utc) - last_message.created_at) > timedelta(days=30) and not last_message.author.bot:
                 for member in ch.members:
                     if member.bot:
                         continue
