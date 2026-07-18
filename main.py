@@ -20,6 +20,8 @@ async def ticket_clean(ctx):
 
 @bot.event
 async def on_reaction_add(reaction, user):
+    print(f"Reaction {reaction.emoji} added by {user.name} in {reaction.message.channel.name}")
+
     if user.bot:
         return
 
@@ -48,12 +50,14 @@ async def delete_closed_and_empty_tickets(channel):
                 k += 1
                 time.sleep(0.1)
             elif ch.name.startswith("ticket"):
+                print("Checking open ticket", ch.name)
                 empty = True
                 async for message in ch.history(limit=10):
-                    if message.author.id != bot.user.id:
-                        if not message.author.id in [member.id for member in ch.guild.members]:
-                            print(message.author.name, "isn't in the discord anymore", ch.name)
-                            break
+                    if ch.guild.get_member(message.author.id) is None:
+                        print(message.author.name, "isn't in the discord anymore", ch.name)
+                        break
+                    elif message.author.id != bot.user.id and not any(role.id in STAFF_ROLE_IDS for role in ch.guild.get_member(message.author.id).roles) and not message.author.bot:
+                        print("Found user message from", message.author.name, "in", ch.name)
                         empty = False
                         break
                 if empty:
@@ -73,15 +77,19 @@ async def ping_inactive_tickets(channel):
                 last_message = message
                 break
 
-            if last_message and (datetime.now(timezone.utc) - last_message.created_at) > timedelta(days=30) and not last_message.author.bot:
+            if last_message and (datetime.now(timezone.utc) - last_message.created_at) > timedelta(days=60) and not last_message.author.bot:
                 for member in ch.members:
                     if member.bot:
                         continue
                     if not any(role.id in STAFF_ROLE_IDS for role in member.roles):
                         print(ch.name)
                         await ch.send(
-                            f"{member.mention} This is an automatic cleaning action. If your issue has been solved, please close the ticket, otherwise please ping one of the staff (we have a lot of tickets and might forget some).")
+                            f"{member.mention} This is an automatic cleaning action. If your issue has been solved, please close the ticket, otherwise please ping one of the staff.")
 
 
 TOKEN = 'your_token'
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user.name}')
+
 bot.run(TOKEN)
